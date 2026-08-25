@@ -32,3 +32,24 @@ build/
 ### VS Code ###
 .vscode/
 
+
+### Env
+.env
+.env.*
+!.env.example
+
+### macOS ###
+.DS_Store
+
+### Logs ###
+*.log
+logs/
+
+### Secrets & keys ###
+# JWT keypair referenced by app.jwt.*-key-path in application.yml
+certs/
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
