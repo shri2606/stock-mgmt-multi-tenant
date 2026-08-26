@@ -1,5 +1,6 @@
 package com.saas.multitenantapp.common;
 
+import com.saas.multitenantapp.config.TenantContext;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
@@ -76,7 +77,7 @@ public class AbstractEntity {
             this.createdBy = "SYSTEM";
         }
         if(this.tenantId == null){
-            this.tenantId = "default";
+            this.tenantId = TenantContext.getCurrentTenant();
         }
 
     }
