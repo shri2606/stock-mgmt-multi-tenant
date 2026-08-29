@@ -1,5 +1,6 @@
 package com.saas.multitenantapp.controllers;
 
+import com.saas.multitenantapp.common.PageResponse;
 import com.saas.multitenantapp.requests.CategoryRequest;
 import com.saas.multitenantapp.responses.CategoryResponse;
 import com.saas.multitenantapp.services.CategoryService;
@@ -9,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/categories")
@@ -51,19 +51,14 @@ public class CategoryController {
         return ResponseEntity.ok(this.service.findById(id));
     }
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> getAllCategories(){
-        return ResponseEntity.ok(this.service.findAll());
+    public ResponseEntity<PageResponse<CategoryResponse>> findAllCategories(
+            @RequestParam(name = "page", defaultValue = "0")
+            final int page,
+            @RequestParam(name = "size", defaultValue = "10")
+            final int size
+    ) {
+        return ResponseEntity.ok(this.service.findAll(page, size));
     }
-
-//    @GetMapping
-//    public ResponseEntity<PageResponse<CategoryResponse>> findAllCategories(
-//            @RequestParam(name = "page", defaultValue = "0")
-//            final int page,
-//            @RequestParam(name = "size", defaultValue = "10")
-//            final int size
-//    ) {
-//        return ResponseEntity.ok(this.service.findAll(page, size));
-//    }
 
     @DeleteMapping("/{category-id}")
     public ResponseEntity<Void> deleteCategory(

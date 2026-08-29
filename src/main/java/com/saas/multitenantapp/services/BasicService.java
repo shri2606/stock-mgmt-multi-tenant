@@ -1,6 +1,6 @@
 package com.saas.multitenantapp.services;
 
-import java.util.List;
+import com.saas.multitenantapp.common.PageResponse;
 
 public interface BasicService <I, O>{
     void create(final I request);
@@ -9,6 +9,6 @@ public interface BasicService <I, O>{
 
     O findById(final String id);
 
-    List<O> findAll();
+    PageResponse<O> findAll(final int page, final int size);
     void delete(final String id);
 }
