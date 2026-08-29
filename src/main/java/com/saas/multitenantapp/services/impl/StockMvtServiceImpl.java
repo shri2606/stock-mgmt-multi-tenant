@@ -47,10 +47,14 @@ public class StockMvtServiceImpl implements StockMvtService {
         }
 
         // check if product exists
-        checkIfProductExistsById(request.getProductId());
+        final Product product = checkIfProductExistsById(request.getProductId());
 
-        final StockMvt stockMvtToUpdate = this.stockMvtMapper.toEntity(request);
-        stockMvtToUpdate.setId(id);
+        final StockMvt stockMvtToUpdate = stockMvt.get();
+        stockMvtToUpdate.setTypeMvt(request.getTypeMvt());
+        stockMvtToUpdate.setQuantity(request.getQuantity());
+        stockMvtToUpdate.setDateMvt(request.getDateMvt());
+        stockMvtToUpdate.setComment(request.getComment());
+        stockMvtToUpdate.setProduct(product);
         this.stockMvtRepository.save(stockMvtToUpdate);
     }
 
@@ -77,11 +81,12 @@ public class StockMvtServiceImpl implements StockMvtService {
 
     }
 
-    private void checkIfProductExistsById(final String productId) {
+    private Product checkIfProductExistsById(final String productId) {
         final Optional<Product> product = this.productRepository.findById(productId);
         if (product.isEmpty()) {
             log.debug("Product does not exist");
             throw new EntityNotFoundException("Product does not exist");
         }
+        return product.get();
     }
 }

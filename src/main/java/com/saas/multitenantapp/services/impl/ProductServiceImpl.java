@@ -50,14 +50,23 @@ public class ProductServiceImpl implements ProductService {
             throw new EntityNotFoundException("Product does not exist");
         }
 
-        // check if product already exists
-        checkIfProductAlreadyExistsByReference(request.getReference());
+        final Product productToUpdate = productExists.get();
+
+        // check if product already exists, only when the reference actually changed
+        if (!productToUpdate.getReference()
+                            .equalsIgnoreCase(request.getReference())) {
+            checkIfProductAlreadyExistsByReference(request.getReference());
+        }
 
         // check if category exists
-        checkIfCategoryExistById(request.getCategoryId());
+        final Category category = checkIfCategoryExistById(request.getCategoryId());
 
-        final Product productToUpdate = this.productMapper.toEntity(request);
-        productToUpdate.setId(id);
+        productToUpdate.setName(request.getName());
+        productToUpdate.setReference(request.getReference());
+        productToUpdate.setDescription(request.getDescription());
+        productToUpdate.setAlertThreshold(request.getAlertThreshold());
+        productToUpdate.setPrice(request.getPrice());
+        productToUpdate.setCategory(category);
         this.productRepository.save(productToUpdate);
 
     }
@@ -93,12 +102,13 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    private void checkIfCategoryExistById(final String categoryId) {
+    private Category checkIfCategoryExistById(final String categoryId) {
         final Optional<Category> category = this.categoryRepository.findById(categoryId);
         if (category.isEmpty()) {
             log.debug("Category does not exist");
             throw new EntityNotFoundException("Category does not exist");
         }
+        return category.get();
     }
 
 

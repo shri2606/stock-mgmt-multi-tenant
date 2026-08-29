@@ -50,9 +50,9 @@ public class CategoryServiceImpl implements CategoryService {
                 .equalsIgnoreCase(request.getName())){
             checkIfCategoryExistsByName(request.getName());
         }
-        final Category updatedCategory = categoryMapper.toEntity(request);
-        updatedCategory.setId(id);
-        this.categoryRepository.save(updatedCategory);
+        category.setName(request.getName());
+        category.setDescription(request.getDescription());
+        this.categoryRepository.save(category);
 
     }
 
