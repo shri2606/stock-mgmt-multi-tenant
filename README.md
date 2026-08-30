@@ -1,4 +1,4 @@
-# Multi-tenant stock management: approach 1, shared schema
+# Multi-tenant stock management: Shared Schema
 
 Every tenant's data lives in the same tables, told apart by a `tenant_id`
 column. Hibernate appends `where tenant_id = ?` to queries on its own, so no
@@ -66,6 +66,4 @@ curl -H 'X-Tenant-ID: alpha' localhost:8080/api/v1/categories
 
 Approach 2: a schema per tenant. Rather than one shared set of tables with a
 `tenant_id` column, each tenant gets its own Postgres schema, created for it
-automatically. The `tenant_id` column, the `@FilterDef`, and the aspect all
-disappear, because the schema boundary does the isolating instead of a `where`
-clause.
+automatically.
