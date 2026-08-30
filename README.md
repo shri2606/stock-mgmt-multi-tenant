@@ -6,18 +6,33 @@ and controllers contain no tenant-aware code.
 
 ## How it works
 
-1. **Request** arrives with an `X-Tenant-ID` header (e.g. `alpha`).
-2. **`TenantFilter`** (servlet filter, highest precedence) reads the header,
-   lowercases it, and stores it in `TenantContext`. Missing header → `400`.
-   The context is cleared in a `finally` block so threads aren't reused dirty.
-3. **`TenantContext`** is a `ThreadLocal<String>` — set / get / clear.
-4. **`TenantHibernateFilter`** is an `@Aspect` that runs `@Before` any method in
-   `com.saas.multitenantapp.services`. It unwraps the Hibernate `Session` and
-   calls `enableFilter("tenantFilter").setParameter("tenantId", ...)`.
-5. **`AbstractEntity`** declares `@FilterDef(name = "tenantFilter", ...)` with
-   the condition `tenant_id = :tenantId`, plus the `@Filter` that activates it.
-6. **Hibernate** rewrites `select ... from categories` into
-   `select ... from categories where tenant_id = ?`.
+```mermaid
+flowchart TD
+    A["HTTP Request<br/>X-Tenant-ID: alpha"]
+    B{"TenantFilter<br/>header present?"}
+    E["400 Bad Request<br/>tenant ID is missing"]
+    C["TenantContext<br/>ThreadLocal = 'alpha'"]
+    D["Controller then Service<br/>@Transactional"]
+    F["TenantHibernateFilter @Before<br/>session.enableFilter('tenantFilter')<br/>.setParameter('tenantId', 'alpha')"]
+    G["Hibernate rewrites the SQL"]
+    H["select * from categories<br/>where tenant_id = 'alpha'"]
+    I["Response: only alpha's rows"]
+    J["finally: TenantContext.clear()"]
+
+    A --> B
+    B -- no --> E
+    B -- yes --> C
+    C --> D
+    D --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+```
+
+The header names the tenant, a `ThreadLocal` carries it through the request, and
+an aspect turns it into a `where` clause. Nothing in the controllers or services
+mentions tenancy.
 
 ## Important
 
