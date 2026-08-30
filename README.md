@@ -6,44 +6,18 @@ and controllers contain no tenant-aware code.
 
 ## How it works
 
-All tenants share one database, one schema, and one set of tables. Rows are
-separated by a `tenant_id` column, and Hibernate adds the `where` clause for you.
-
-```mermaid
-flowchart TD
-    TA["Tenant A<br/>Company Alpha"]
-    TB["Tenant B<br/>Company Beta"]
-    TC["Tenant C<br/>Company Gamma"]
-
-    subgraph APP["Spring Boot - single instance"]
-        direction TB
-        TF["TenantFilter<br/>reads X-Tenant-ID<br/>stores it in TenantContext"]
-        HF["TenantHibernateFilter (aspect)<br/>enables tenantFilter on the session<br/>adds where tenant_id = :tenantId"]
-        TF --> HF
-    end
-
-    DB[("PostgreSQL<br/>single shared database")]
-    ERR["400 Bad Request<br/>tenant ID is missing"]
-
-    TA -->|"X-Tenant-ID: alpha"| TF
-    TB -->|"X-Tenant-ID: beta"| TF
-    TC -->|"X-Tenant-ID: gamma"| TF
-    TF -.->|"no header"| ERR
-    HF --> DB
-```
-
-Every tenant's rows live side by side in the same table, told apart only by
-`tenant_id`:
-
-| id | tenant_id | name | price |
-|----|-----------|------|-------|
-| 1  | alpha     | Mechanical keyboard | 89.99 |
-| 2  | alpha     | Ergonomic mouse     | 45.50 |
-| 3  | beta      | 27-inch screen      | 349.00 |
-| 4  | gamma     | HDMI cable          | 12.99 |
-
-A request carrying `X-Tenant-ID: alpha` sees rows 1 and 2 only. The other rows
-are invisible to it.
+1. **Request** arrives with an `X-Tenant-ID` header (e.g. `alpha`).
+2. **`TenantFilter`** (servlet filter, highest precedence) reads the header,
+   lowercases it, and stores it in `TenantContext`. Missing header → `400`.
+   The context is cleared in a `finally` block so threads aren't reused dirty.
+3. **`TenantContext`** is a `ThreadLocal<String>` — set / get / clear.
+4. **`TenantHibernateFilter`** is an `@Aspect` that runs `@Before` any method in
+   `com.saas.multitenantapp.services`. It unwraps the Hibernate `Session` and
+   calls `enableFilter("tenantFilter").setParameter("tenantId", ...)`.
+5. **`AbstractEntity`** declares `@FilterDef(name = "tenantFilter", ...)` with
+   the condition `tenant_id = :tenantId`, plus the `@Filter` that activates it.
+6. **Hibernate** rewrites `select ... from categories` into
+   `select ... from categories where tenant_id = ?`.
 
 ## Important
 
