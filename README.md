@@ -51,6 +51,6 @@ curl -H 'X-Tenant-ID: alpha' localhost:8080/api/v1/categories
 
 ## Next steps
 
-I will be updating the project schema per tenant. Rather than one shared set of tables with a
+I will be updating the project to "schema per tenant". Rather than one shared set of tables with a
 `tenant_id` column, each tenant gets its own Postgres schema, created for it
 automatically.
