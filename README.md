@@ -57,13 +57,10 @@ Flyway owns the schema (`db/migration/common`): **V1** creates the tables,
 curl -H 'X-Tenant-ID: alpha' localhost:8080/api/v1/categories
 ```
 
-## Known gaps
+## Next steps
 
-- `X-Tenant-ID` is self-asserted — no authentication yet, so any caller can
-  claim any tenant. Security comes with approach 2.
-- `findById` bypasses the filter entirely: Hibernate `@Filter` does not apply
-  to primary-key lookups, so GET/PUT/DELETE by id can reach another tenant's row.
-- Unique constraints on `categories.name` and `products.reference` are global,
-  so two tenants can't reuse the same name or reference.
-- Request DTOs carry no validation annotations, and there's no exception
-  handler, so bad input surfaces as a 500.
+Move on to approach 2: **a schema per tenant**. Instead of one shared set of
+tables with a `tenant_id` column, each tenant gets its own Postgres schema,
+provisioned automatically when the tenant is created. The `tenant_id` column,
+the `@FilterDef`, and the aspect all go away — isolation comes from the schema
+itself rather than a `where` clause.
