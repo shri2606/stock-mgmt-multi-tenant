@@ -6,33 +6,45 @@ and controllers contain no tenant-aware code.
 
 ## How it works
 
-```mermaid
-flowchart TD
-    A["HTTP Request<br/>X-Tenant-ID: alpha"]
-    B{"TenantFilter<br/>header present?"}
-    E["400 Bad Request<br/>tenant ID is missing"]
-    C["TenantContext<br/>ThreadLocal = 'alpha'"]
-    D["Controller then Service<br/>@Transactional"]
-    F["TenantHibernateFilter @Before<br/>session.enableFilter('tenantFilter')<br/>.setParameter('tenantId', 'alpha')"]
-    G["Hibernate rewrites the SQL"]
-    H["select * from categories<br/>where tenant_id = 'alpha'"]
-    I["Response: only alpha's rows"]
-    J["finally: TenantContext.clear()"]
+All tenants share one database and one set of tables. Rows are separated by a
+`tenant_id` column, and Hibernate adds the `where` clause for you.
 
-    A --> B
-    B -- no --> E
-    B -- yes --> C
-    C --> D
-    D --> F
-    F --> G
-    G --> H
-    H --> I
-    I --> J
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Tenant A (alpha)
+    participant F as TenantFilter
+    participant C as TenantContext
+    participant S as Service (@Transactional)
+    participant X as TenantHibernateFilter
+    participant H as Hibernate
+    participant DB as PostgreSQL (shared)
+
+    A->>F: GET /api/v1/products (X-Tenant-ID: alpha)
+    F->>F: resolveHeader()
+
+    alt header missing or blank
+        F-->>A: 400 - tenant ID is missing
+    else header present
+        F->>C: setCurrentTenant("alpha")
+        F->>S: invoke service method
+        Note over X: @Before advice fires
+        X->>C: getCurrentTenant()
+        C-->>X: "alpha"
+        X->>H: enableFilter("tenantFilter").setParameter("tenantId", "alpha")
+        S->>H: repository.findAll(pageable)
+        H->>DB: select * from products where tenant_id = 'alpha'
+        DB-->>H: only tenant A rows
+        H-->>S: Page of Product
+        S-->>A: 200 - tenant A rows only
+    end
+
+    F->>C: clear()
 ```
 
-The header names the tenant, a `ThreadLocal` carries it through the request, and
-an aspect turns it into a `where` clause. Nothing in the controllers or services
-mentions tenancy.
+Tenant B sends the same request with `X-Tenant-ID: beta` and reaches the same
+instance and the same table, but Hibernate scopes the query to `beta`, so the
+two tenants never see each other's rows.
 
 ## Important
 
