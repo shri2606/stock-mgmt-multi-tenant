@@ -40,7 +40,7 @@ public class StockMvtServiceImpl implements StockMvtService {
 
     @Override
     public void update(final String id, final StockMvtRequest request) {
-        final Optional<StockMvt> stockMvt = this.stockMvtRepository.findById(id);
+        final Optional<StockMvt> stockMvt = this.stockMvtRepository.findOneById(id);
         if (stockMvt.isEmpty()) {
             log.debug("StockMvt does not exist");
             throw new EntityNotFoundException("StockMvt does not exist");
@@ -68,21 +68,21 @@ public class StockMvtServiceImpl implements StockMvtService {
 
     @Override
     public StockMvtResponse findById(final String id) {
-        return this.stockMvtRepository.findById(id)
+        return this.stockMvtRepository.findOneById(id)
                                       .map(this.stockMvtMapper::toResponse)
                                       .orElseThrow(() -> new EntityNotFoundException("StockMvt does not exist"));
     }
 
     @Override
     public void delete(final String id) {
-        final StockMvt stockMvt = this.stockMvtRepository.findById(id)
+        final StockMvt stockMvt = this.stockMvtRepository.findOneById(id)
                                                          .orElseThrow(() -> new EntityNotFoundException("StockMvt does not exist"));
         this.stockMvtRepository.delete(stockMvt);
 
     }
 
     private Product checkIfProductExistsById(final String productId) {
-        final Optional<Product> product = this.productRepository.findById(productId);
+        final Optional<Product> product = this.productRepository.findOneById(productId);
         if (product.isEmpty()) {
             log.debug("Product does not exist");
             throw new EntityNotFoundException("Product does not exist");

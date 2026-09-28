@@ -38,7 +38,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public void update(String id, CategoryRequest request) {
-        final Optional<Category> existingCategory = this.categoryRepository.findById(id);
+        final Optional<Category> existingCategory = this.categoryRepository.findOneById(id);
         if(existingCategory.isEmpty()){
             log.debug("Category not found");
             throw new EntityNotFoundException("Category not found");
@@ -58,7 +58,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public CategoryResponse findById(String id) {
-        return this.categoryRepository.findById(id)
+        return this.categoryRepository.findOneById(id)
                 .map(this.categoryMapper::toResponse)
                 .orElseThrow(() -> new EntityNotFoundException(("Category not found")));
     }
@@ -73,7 +73,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public void delete(String id) {
-        final Category category = this.categoryRepository.findById(id)
+        final Category category = this.categoryRepository.findOneById(id)
                 .orElseThrow(() -> new EntityNotFoundException(("Category not found")));
 
         this.categoryRepository.delete(category);

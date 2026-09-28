@@ -44,7 +44,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public void update(final String id, final ProductRequest request) {
         // check if product exists
-        final Optional<Product> productExists = this.productRepository.findById(id);
+        final Optional<Product> productExists = this.productRepository.findOneById(id);
         if (productExists.isEmpty()) {
             log.debug("Product does not exist");
             throw new EntityNotFoundException("Product does not exist");
@@ -81,14 +81,14 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductResponse findById(final String id) {
-        return this.productRepository.findById(id)
+        return this.productRepository.findOneById(id)
                                      .map(this.productMapper::toResponse)
                                      .orElseThrow(() -> new EntityNotFoundException("Product does not exist"));
     }
 
     @Override
     public void delete(final String id) {
-        final Product product = this.productRepository.findById(id)
+        final Product product = this.productRepository.findOneById(id)
                                                       .orElseThrow(() -> new EntityNotFoundException("Product does not exist"));
         this.productRepository.delete(product);
 
@@ -103,7 +103,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private Category checkIfCategoryExistById(final String categoryId) {
-        final Optional<Category> category = this.categoryRepository.findById(categoryId);
+        final Optional<Category> category = this.categoryRepository.findOneById(categoryId);
         if (category.isEmpty()) {
             log.debug("Category does not exist");
             throw new EntityNotFoundException("Category does not exist");
