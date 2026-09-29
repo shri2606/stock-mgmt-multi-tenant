@@ -38,6 +38,11 @@ build/
 .env.*
 !.env.example
 
+### Node / front end ###
+node_modules/
+*.tsbuildinfo
+.vite/
+
 ### macOS ###
 .DS_Store
 
