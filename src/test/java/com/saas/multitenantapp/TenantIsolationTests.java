@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Tenant isolation for approach 1, the single shared database.
+ * Tenant isolation for the single shared database.
  *
  * Runs against the Postgres in docker compose, the same one the app uses, and is
  * @Transactional so every row it writes is rolled back afterwards.
