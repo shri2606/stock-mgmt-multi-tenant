@@ -13,14 +13,29 @@ export const TENANT_STORAGE_KEY = 'tenantId';
 /**
  * How the client tells the backend which tenant it is.
  *
- * This is the whole tenancy seam on the front end. Today it reads a tenant the
- * user typed, so the header is self-asserted and nothing verifies it. If that is
- * ever replaced by a signed token, this is the only file that has to change.
+ * This is the whole tenancy seam on the front end. It reads a tenant the user
+ * typed, so the header is self-asserted and nothing verifies it. Entra ID does
+ * not change that: it proves *who* is calling, never which tenant they may act
+ * as. Closing that gap means replacing this provider with something derived from
+ * a server-side user-to-tenant mapping, and this is still the only file that
+ * would have to change.
  */
 let tenantProvider: () => string | null = () => localStorage.getItem(TENANT_STORAGE_KEY);
 
 export function setTenantProvider(provider: () => string | null): void {
   tenantProvider = provider;
+}
+
+/**
+ * How the client proves who it is. Deliberately the same shape as the tenant
+ * provider above, and registered from `main.tsx` so this module never imports
+ * MSAL — the API layer stays testable and knows nothing about the identity
+ * provider beyond "a string, or null if nobody is signed in".
+ */
+let tokenProvider: () => Promise<string | null> = async () => null;
+
+export function setTokenProvider(provider: () => Promise<string | null>): void {
+  tokenProvider = provider;
 }
 
 export class ApiError extends Error {
@@ -59,6 +74,12 @@ const CONSTRAINT_MESSAGES: ReadonlyArray<[RegExp, string]> = [
 ];
 
 function humanise(raw: string, status: number): string {
+  if (status === 401) {
+    return 'Not signed in, or the session expired. Sign in again.';
+  }
+  if (status === 403) {
+    return 'Signed in, but not allowed to do that.';
+  }
   for (const [pattern, message] of CONSTRAINT_MESSAGES) {
     if (pattern.test(raw)) return message;
   }
@@ -91,6 +112,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const tenant = tenantProvider();
   if (tenant) headers.set('X-Tenant-ID', tenant);
+
+  // Two independent headers: Entra answers "who", X-Tenant-ID answers "which
+  // tenant". The backend reads them in two different filters that never meet.
+  const token = await tokenProvider();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const res = await fetch(`/api/v1${path}`, { ...init, headers });
   if (!res.ok) throw new ApiError(res.status, await readError(res));

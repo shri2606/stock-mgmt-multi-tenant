@@ -87,6 +87,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   border-bottom: 1px solid var(--border);
 }
 
+/* the right-hand side of the top bar: tenant pill plus the signed-in account */
+.topbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.account { display: flex; align-items: center; gap: 10px; }
+.nav-link-locked { opacity: 0.4; cursor: default; }
+.account .small { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .content { padding: 24px; max-width: 1100px; width: 100%; }
 
 .page-head {
