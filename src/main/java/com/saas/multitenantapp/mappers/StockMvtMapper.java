@@ -23,6 +23,7 @@ public class StockMvtMapper {
 
     public StockMvtResponse toResponse(final StockMvt entity) {
         return StockMvtResponse.builder()
+                               .id(entity.getId())
                                .dateMvt(entity.getDateMvt())
                                .comment(entity.getComment())
                                .typeMvt(entity.getTypeMvt())
