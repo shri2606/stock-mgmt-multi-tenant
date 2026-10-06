@@ -1,68 +1,49 @@
 package com.saas.multitenantapp.config;
 
-import jakarta.servlet.*;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-@Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
-public class TenantFilter implements Filter {
+/**
+ * Pulls the tenant off the request and into {@link TenantContext} for the
+ * duration of the call.
+ *
+ * Deliberately not a @Component: SecurityConfig constructs it and places it
+ * after the bearer token filter. Registering it as a bean as well would have the
+ * servlet container run it a second time, outside the security chain.
+ */
+public class TenantFilter extends OncePerRequestFilter {
 
     private static final String TENANT_HEADER = "X-Tenant-ID";
 
-    // The API docs describe the API itself, so they carry no tenant. Without
-    // this the filter rejects them with a 400 before springdoc ever runs.
-    private static final String[] EXEMPT_PATH_PREFIXES = {
-            "/v3/api-docs",
-            "/swagger-ui"
-    };
-
     @Override
-    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
-        final HttpServletRequest request = (HttpServletRequest) servletRequest;
-        final HttpServletResponse response = (HttpServletResponse) servletResponse;
-
-        if(isExempt(request)){
-            filterChain.doFilter(servletRequest, servletResponse);
-            return;
-        }
-
+    protected void doFilterInternal(final HttpServletRequest request,
+                                    final HttpServletResponse response,
+                                    final FilterChain filterChain) throws ServletException, IOException {
         final String tenantId = resolveHeader(request);
-        if(tenantId == null || tenantId.isBlank()){
+        if (tenantId == null) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\": \"Tenant ID is missing in the request header, please add the X-Tenant-ID\"}");
+            response.getWriter()
+                    .write("{\"error\": \"Tenant ID is missing in the request header, please add the X-Tenant-ID\"}");
             return;
         }
-        try{
+        try {
             TenantContext.setCurrentTenant(tenantId);
-            filterChain.doFilter(servletRequest, servletResponse);
-        }finally {
+            filterChain.doFilter(request, response);
+        } finally {
             TenantContext.clear();
         }
     }
 
-    private boolean isExempt(HttpServletRequest request) {
-        final String path = request.getRequestURI()
-                                   .substring(request.getContextPath()
-                                                     .length());
-        for (final String prefix : EXEMPT_PATH_PREFIXES) {
-            if(path.startsWith(prefix)){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String resolveHeader(HttpServletRequest request) {
+    private String resolveHeader(final HttpServletRequest request) {
         final String tenantId = request.getHeader(TENANT_HEADER);
-        if(tenantId != null && !tenantId.isBlank()){
-            return  tenantId.toLowerCase();
+        if (tenantId != null && !tenantId.isBlank()) {
+            return tenantId.toLowerCase();
         }
         return null;
     }

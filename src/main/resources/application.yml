@@ -35,6 +35,15 @@ spring:
     show-sql: true
     open-in-view: false
 
+  # Entra ID is the identity provider for login only. The directory is fixed, so
+  # one issuer is enough; the tid claim carries no tenancy and nothing reads it.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.microsoftonline.com/${ENTRA_TENANT_ID}/v2.0
+          audiences: ${ENTRA_API_CLIENT_ID}
+
   # Flyway Configuration
   flyway:
     enabled: true
