@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -39,6 +40,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   - Assertions about what is in the database use JdbcTemplate, not the
  *     repositories, because the Hibernate filter would scope a repository read
  *     to whichever tenant ran last and hide the very rows being checked.
+ *
+ * Every request carries .with(jwt()), because Entra ID now authenticates the
+ * caller. The token is not what identifies the tenant, though: the directory is
+ * fixed, so tenancy still rides on X-Tenant-ID and these tests still prove the
+ * same thing they proved before the login existed.
  *
  * Cross-tenant requests are asserted as "not successful" rather than as 404.
  * Today they surface as 500 because there is no exception handler yet; when one
@@ -85,10 +91,12 @@ class TenantIsolationTests {
         final String id = createCategory(TENANT_A, name);
 
         assertBlocked(get("/api/v1/categories/{id}", id)
+                              .with(jwt())
                               .header(TENANT_HEADER, TENANT_B));
 
         // and the owner can still read it
         this.mockMvc.perform(get("/api/v1/categories/{id}", id)
+                                     .with(jwt())
                                      .header(TENANT_HEADER, TENANT_A))
                     .andExpect(status().isOk());
     }
@@ -102,6 +110,7 @@ class TenantIsolationTests {
         final String id = createCategory(TENANT_A, name);
 
         assertBlocked(put("/api/v1/categories/{id}", id)
+                              .with(jwt())
                               .header(TENANT_HEADER, TENANT_B)
                               .contentType(MediaType.APPLICATION_JSON)
                               .content(categoryBody(uniqueName("hijacked"), "written by the wrong tenant")));
@@ -119,6 +128,7 @@ class TenantIsolationTests {
         final String id = createCategory(TENANT_A, uniqueName("cat"));
 
         assertBlocked(delete("/api/v1/categories/{id}", id)
+                              .with(jwt())
                               .header(TENANT_HEADER, TENANT_B));
 
         assertThat(categoryExistsInDatabase(id))
@@ -135,6 +145,7 @@ class TenantIsolationTests {
         final String reference = uniqueName("ref");
 
         assertBlocked(post("/api/v1/products")
+                              .with(jwt())
                               .header(TENANT_HEADER, TENANT_B)
                               .contentType(MediaType.APPLICATION_JSON)
                               .content(productBody(uniqueName("prod"), reference, categoryId)));
@@ -152,6 +163,7 @@ class TenantIsolationTests {
         final String productId = createProduct(TENANT_A, uniqueName("prod"), reference, categoryId);
 
         assertBlocked(post("/api/v1/stocks")
+                              .with(jwt())
                               .header(TENANT_HEADER, TENANT_B)
                               .contentType(MediaType.APPLICATION_JSON)
                               .content(stockMvtBody(productId)));
@@ -169,10 +181,37 @@ class TenantIsolationTests {
         final String stockMvtId = createStockMvt(TENANT_A, productId);
 
         assertBlocked(get("/api/v1/stocks/{id}", stockMvtId)
+                              .with(jwt())
                               .header(TENANT_HEADER, TENANT_B));
 
         this.mockMvc.perform(get("/api/v1/stocks/{id}", stockMvtId)
+                                     .with(jwt())
                                      .header(TENANT_HEADER, TENANT_A))
+                    .andExpect(status().isOk());
+    }
+
+    // -------------------------------------------------- authentication
+
+    @Test
+    @DisplayName("a request without a token is rejected before the tenant header is read")
+    void requestWithoutTokenIsUnauthorized() throws Exception {
+        this.mockMvc.perform(get("/api/v1/categories").header(TENANT_HEADER, TENANT_A))
+                    .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("a request with neither a token nor a tenant header is 401, not 400")
+    void requestWithoutTokenOrTenantIsUnauthorized() throws Exception {
+        // The tenant filter must not answer before authorization has run, or an
+        // unauthenticated caller is told which header to add next.
+        this.mockMvc.perform(get("/api/v1/categories"))
+                    .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("the api docs need neither a token nor a tenant")
+    void apiDocsAreOpen() throws Exception {
+        this.mockMvc.perform(get("/v3/api-docs"))
                     .andExpect(status().isOk());
     }
 
@@ -181,14 +220,14 @@ class TenantIsolationTests {
     @Test
     @DisplayName("a request without the tenant header is rejected")
     void requestWithoutTenantHeaderIsRejected() throws Exception {
-        this.mockMvc.perform(get("/api/v1/categories"))
+        this.mockMvc.perform(get("/api/v1/categories").with(jwt()))
                     .andExpect(status().isBadRequest());
     }
 
     @Test
     @DisplayName("a blank tenant header is rejected")
     void requestWithBlankTenantHeaderIsRejected() throws Exception {
-        this.mockMvc.perform(get("/api/v1/categories").header(TENANT_HEADER, "   "))
+        this.mockMvc.perform(get("/api/v1/categories").with(jwt()).header(TENANT_HEADER, "   "))
                     .andExpect(status().isBadRequest());
     }
 
@@ -212,6 +251,7 @@ class TenantIsolationTests {
 
         // an update that keeps the name must not trip the duplicate-name check
         this.mockMvc.perform(put("/api/v1/categories/{id}", categoryId)
+                                     .with(jwt())
                                      .header(TENANT_HEADER, TENANT_A)
                                      .contentType(MediaType.APPLICATION_JSON)
                                      .content(categoryBody(name, "changed description")))
@@ -219,6 +259,7 @@ class TenantIsolationTests {
 
         final String renamed = uniqueName("cat");
         this.mockMvc.perform(put("/api/v1/categories/{id}", categoryId)
+                                     .with(jwt())
                                      .header(TENANT_HEADER, TENANT_A)
                                      .contentType(MediaType.APPLICATION_JSON)
                                      .content(categoryBody(renamed, "renamed")))
@@ -228,11 +269,11 @@ class TenantIsolationTests {
         final String productId = createProduct(TENANT_A, uniqueName("prod"), uniqueName("ref"), categoryId);
         final String stockMvtId = createStockMvt(TENANT_A, productId);
 
-        this.mockMvc.perform(delete("/api/v1/stocks/{id}", stockMvtId).header(TENANT_HEADER, TENANT_A))
+        this.mockMvc.perform(delete("/api/v1/stocks/{id}", stockMvtId).with(jwt()).header(TENANT_HEADER, TENANT_A))
                     .andExpect(status().isNoContent());
-        this.mockMvc.perform(delete("/api/v1/products/{id}", productId).header(TENANT_HEADER, TENANT_A))
+        this.mockMvc.perform(delete("/api/v1/products/{id}", productId).with(jwt()).header(TENANT_HEADER, TENANT_A))
                     .andExpect(status().isNoContent());
-        this.mockMvc.perform(delete("/api/v1/categories/{id}", categoryId).header(TENANT_HEADER, TENANT_A))
+        this.mockMvc.perform(delete("/api/v1/categories/{id}", categoryId).with(jwt()).header(TENANT_HEADER, TENANT_A))
                     .andExpect(status().isNoContent());
 
         assertThat(categoryExistsInDatabase(categoryId)).isFalse();
@@ -287,6 +328,7 @@ class TenantIsolationTests {
 
     private String createCategory(final String tenant, final String name) throws Exception {
         this.mockMvc.perform(post("/api/v1/categories")
+                                     .with(jwt())
                                      .header(TENANT_HEADER, tenant)
                                      .contentType(MediaType.APPLICATION_JSON)
                                      .content(categoryBody(name, "d")))
@@ -297,6 +339,7 @@ class TenantIsolationTests {
     private String createProduct(final String tenant, final String name, final String reference,
                                  final String categoryId) throws Exception {
         this.mockMvc.perform(post("/api/v1/products")
+                                     .with(jwt())
                                      .header(TENANT_HEADER, tenant)
                                      .contentType(MediaType.APPLICATION_JSON)
                                      .content(productBody(name, reference, categoryId)))
@@ -306,6 +349,7 @@ class TenantIsolationTests {
 
     private String createStockMvt(final String tenant, final String productId) throws Exception {
         this.mockMvc.perform(post("/api/v1/stocks")
+                                     .with(jwt())
                                      .header(TENANT_HEADER, tenant)
                                      .contentType(MediaType.APPLICATION_JSON)
                                      .content(stockMvtBody(productId)))
@@ -315,6 +359,7 @@ class TenantIsolationTests {
 
     private List<String> categoryNamesVisibleTo(final String tenant) throws Exception {
         final String body = this.mockMvc.perform(get("/api/v1/categories")
+                                                         .with(jwt())
                                                          .header(TENANT_HEADER, tenant)
                                                          .param("page", "0")
                                                          .param("size", "100"))
